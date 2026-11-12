@@ -10,7 +10,7 @@ function loadSession(int $userId): array
     $file = sessionFile($userId);
     if (file_exists($file)) {
         $data = json_decode(file_get_contents($file), true);
-        return is_array($data) ? $data : defaultSession();
+        return is_array($data) ? array_merge(defaultSession(), $data) : defaultSession();
     }
     return defaultSession();
 }
@@ -20,7 +20,7 @@ function saveSession(int $userId, array $session): void
     if (!is_dir(DATA_DIR)) {
         mkdir(DATA_DIR, 0755, true);
     }
-    file_put_contents(sessionFile($userId), json_encode($session, JSON_PRETTY_PRINT));
+    file_put_contents(sessionFile($userId), json_encode($session, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 }
 
 function defaultSession(): array
@@ -28,6 +28,7 @@ function defaultSession(): array
     return [
         'state' => 'idle',
         'cart'  => [],
+        'temp'  => [],
     ];
 }
 
@@ -66,22 +67,19 @@ function cartCount(array $session): int
 function cartSummaryText(array $session): string
 {
     if (empty($session['cart'])) {
-        return "🛒 Your cart is empty.";
+        return "🛒 Savatchangiz hozircha bo‘sh.";
     }
 
-    $lines = ["🛒 *Your Cart*
-"];
+    $lines = ["🛒 *Sizning savatchangiz:*\n"];
     $i = 1;
     foreach ($session['cart'] as $pid => $qty) {
         $p = getProductById((int)$pid);
         if ($p) {
             $subtotal = $p['price'] * $qty;
-            $lines[] = "{$i}. {$p['emoji']} {$p['name']} × {$qty} = " . CURRENCY . number_format($subtotal, 2);
+            $lines[] = "{$i}. {$p['emoji']} " . escapeMd($p['name']) . " × {$qty} = " . formatPrice($subtotal);
             $i++;
         }
     }
-    $lines[] = "
-💰 *Total: " . CURRENCY . number_format(cartTotal($session), 2) . "*";
-    return implode("
-", $lines);
+    $lines[] = "\n💰 *Jami summa: " . formatPrice(cartTotal($session)) . "*";
+    return implode("\n", $lines);
 }
