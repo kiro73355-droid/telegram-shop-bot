@@ -16,6 +16,16 @@ function apiRequest(string $method, array $params): array
     return json_decode($result, true) ?? [];
 }
 
+function formatPrice(float|int $price): string
+{
+    return number_format($price, 0, '.', ' ') . ' ' . CURRENCY;
+}
+
+function escapeMd(string $text): string
+{
+    return str_replace(['*', '_', '`', '['], ['\*', '\_', '\`', '\['], $text);
+}
+
 function sendMessage(int $chatId, string $text, array $keyboard = [], string $parseMode = 'Markdown'): void
 {
     $params = [
@@ -62,21 +72,29 @@ function answerCallback(string $callbackId, string $text = '', bool $showAlert =
     ]);
 }
 
-function mainMenuKeyboard(): array
+function mainMenuKeyboard(int $userId = 0): array
 {
-    return [
+    $rows = [
         [
-            ['text' => '🛍️ Shop',      'callback_data' => 'menu_shop'],
-            ['text' => '🛒 My Cart',   'callback_data' => 'menu_cart'],
+            ['text' => '🛍️ Do‘kon',          'callback_data' => 'menu_shop'],
+            ['text' => '🛒 Savatcham',       'callback_data' => 'menu_cart'],
         ],
         [
-            ['text' => '📦 My Orders', 'callback_data' => 'menu_orders'],
-            ['text' => 'ℹ️ Help',       'callback_data' => 'menu_help'],
+            ['text' => '📦 Buyurtmalarim',   'callback_data' => 'menu_orders'],
+            ['text' => 'ℹ️ Yordam',          'callback_data' => 'menu_help'],
         ],
     ];
+
+    if ($userId === ADMIN_ID) {
+        $rows[] = [
+            ['text' => '⚙️ Admin Panel', 'callback_data' => 'admin_menu'],
+        ];
+    }
+
+    return $rows;
 }
 
-function categoryKeyboard(): array
+function categoryKeyboard(string $prefix = 'cat_', bool $isAdmin = false): array
 {
     $rows = [];
     $categories = getCategories();
@@ -84,11 +102,17 @@ function categoryKeyboard(): array
     foreach ($chunk as $group) {
         $row = [];
         foreach ($group as $key) {
-            $row[] = ['text' => $categories[$key], 'callback_data' => "cat_{$key}"];
+            $row[] = ['text' => $categories[$key], 'callback_data' => "{$prefix}{$key}"];
         }
         $rows[] = $row;
     }
-    $rows[] = [['text' => '🏠 Main Menu', 'callback_data' => 'menu_main']];
+
+    if ($isAdmin) {
+        $rows[] = [['text' => '❌ Bekor qilish', 'callback_data' => 'admin_cancel']];
+    } else {
+        $rows[] = [['text' => '🏠 Bosh menyu', 'callback_data' => 'menu_main']];
+    }
+
     return $rows;
 }
 
@@ -96,11 +120,14 @@ function productsKeyboard(array $products, string $category): array
 {
     $rows = [];
     foreach ($products as $p) {
-        $rows[] = [['text' => "{$p['emoji']} {$p['name']} — " . CURRENCY . $p['price'], 'callback_data' => "product_{$p['id']}"]];
+        $rows[] = [[
+            'text'          => "{$p['emoji']} {$p['name']} — " . formatPrice($p['price']),
+            'callback_data' => "product_{$p['id']}"
+        ]];
     }
     $rows[] = [
-        ['text' => '⬅️ Categories', 'callback_data' => 'menu_shop'],
-        ['text' => '🛒 Cart',       'callback_data' => 'menu_cart'],
+        ['text' => '⬅️ Kategoriyalar', 'callback_data' => 'menu_shop'],
+        ['text' => '🛒 Savatcha',      'callback_data' => 'menu_cart'],
     ];
     return $rows;
 }
@@ -109,12 +136,12 @@ function productDetailKeyboard(int $productId): array
 {
     return [
         [
-            ['text' => '➕ Add to Cart', 'callback_data' => "add_{$productId}"],
-            ['text' => '🛒 View Cart',   'callback_data' => 'menu_cart'],
+            ['text' => '➕ Savatga qo‘shish', 'callback_data' => "add_{$productId}"],
+            ['text' => '🛒 Savatni ko‘rish',  'callback_data' => 'menu_cart'],
         ],
         [
-            ['text' => '⬅️ Back',        'callback_data' => 'menu_shop'],
-            ['text' => '🏠 Main Menu',   'callback_data' => 'menu_main'],
+            ['text' => '⬅️ Orqaga',           'callback_data' => 'menu_shop'],
+            ['text' => '🏠 Bosh menyu',       'callback_data' => 'menu_main'],
         ],
     ];
 }
@@ -127,18 +154,58 @@ function cartKeyboard(array $session): array
         foreach ($session['cart'] as $pid => $qty) {
             $p = getProductById((int)$pid);
             if ($p) {
-                $rows[] = [['text' => "✗ Remove {$p['emoji']} {$p['name']}", 'callback_data' => "remove_{$pid}"]];
+                $rows[] = [['text' => "❌ O‘chirish: {$p['emoji']} {$p['name']}", 'callback_data' => "remove_{$pid}"]];
             }
         }
         $rows[] = [
-            ['text' => '✓ Checkout',    'callback_data' => 'checkout'],
-            ['text' => '🗑️ Clear Cart', 'callback_data' => 'clear_cart'],
+            ['text' => '✅ Buyurtma berish', 'callback_data' => 'checkout'],
+            ['text' => '🗑️ Tozalash',        'callback_data' => 'clear_cart'],
         ];
     }
 
     $rows[] = [
-        ['text' => '🛍️ Continue Shopping', 'callback_data' => 'menu_shop'],
-        ['text' => '🏠 Main Menu',          'callback_data' => 'menu_main'],
+        ['text' => '🛍️ Xaridni davom ettirish', 'callback_data' => 'menu_shop'],
+        ['text' => '🏠 Bosh menyu',             'callback_data' => 'menu_main'],
     ];
+    return $rows;
+}
+
+function adminMenuKeyboard(): array
+{
+    return [
+        [
+            ['text' => '➕ Mahsulot qo‘shish',  'callback_data' => 'admin_add_product'],
+            ['text' => '🗑️ Mahsulot o‘chirish', 'callback_data' => 'admin_del_list'],
+        ],
+        [
+            ['text' => '📦 Barcha buyurtmalar', 'callback_data' => 'admin_orders'],
+            ['text' => '📊 Statistika',         'callback_data' => 'admin_stats'],
+        ],
+        [
+            ['text' => '📢 Xabar yuborish',     'callback_data' => 'admin_broadcast'],
+        ],
+        [
+            ['text' => '🏠 Bosh menyu',         'callback_data' => 'menu_main'],
+        ],
+    ];
+}
+
+function adminCancelKeyboard(): array
+{
+    return [
+        [['text' => '❌ Bekor qilish', 'callback_data' => 'admin_cancel']],
+    ];
+}
+
+function adminDeleteProductsKeyboard(array $products): array
+{
+    $rows = [];
+    foreach ($products as $p) {
+        $rows[] = [[
+            'text'          => "🗑️ {$p['emoji']} {$p['name']} (" . formatPrice($p['price']) . ")",
+            'callback_data' => "admin_del_{$p['id']}"
+        ]];
+    }
+    $rows[] = [['text' => '⬅️ Admin menyu', 'callback_data' => 'admin_menu']];
     return $rows;
 }
