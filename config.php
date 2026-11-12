@@ -1,7 +1,9 @@
 <?php
 
-define('BOT_TOKEN', '8833446197:AAE4Rm2VyMHYL-eCyaSJz5IqsoNbMwQY9jM');
-define('BOT_URL',   'https://api.telegram.org/bot' . BOT_TOKEN);
-define('DATA_DIR', __DIR__ . '/data/');
-define('CURRENCY', 'UZS');
-define('ADMIN_ID', 7371659909);
+define('BOT_TOKEN',      '8833446197:AAE4Rm2VyMHYL-eCyaSJz5IqsoNbMwQY9jM');
+define('BOT_URL',        'https://api.telegram.org/bot' . BOT_TOKEN);
+define('DATA_DIR',       __DIR__ . '/data/');
+define('CURRENCY',       'UZS');
+define('ADMIN_ID',       7371659909);
+define('PAYMENT_CARD',   '8600 0000 0000 0000');
+define('PAYMENT_HOLDER', 'ADMIN');
