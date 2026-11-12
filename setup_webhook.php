@@ -2,7 +2,7 @@
 
 require_once __DIR__ . '/config.php';
 
-$webhookUrl = 'https://yourdomain.com/telegram-shop-bot/webhook.php';
+$webhookUrl = 'https://' . getenv('RAILWAY_PUBLIC_DOMAIN') . '/webhook.php';
 
 $action = $_GET['action'] ?? 'set';
 
